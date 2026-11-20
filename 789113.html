@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>抢手机大赛 beta</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #222; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; margin: 0 auto; background: #f0f0f0; }
+        
+        .menu-container {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; color: white; transition: opacity 0.3s ease;
+        }
+        .menu-container h1 {
+            font-size: 48px; margin: 0 0 10px 0; color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 4px;
+        }
+        .menu-container h2 {
+            font-size: 24px; margin: 0 0 50px 0; color: #ccc;
+            font-weight: normal; letter-spacing: 2px; text-transform: uppercase;
+        }
+        .menu-btn {
+            width: 200px; padding: 15px 0; margin: 10px 0;
+            font-size: 20px; font-weight: bold; color: #333;
+            background: #fff; border: none; border-radius: 30px;
+            cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .menu-btn:hover { transform: scale(1.05); box-shadow: 0 6px 12px rgba(0,0,0,0.4); }
+        .menu-btn:active { transform: scale(0.95); }
+        .btn-danger { background: #ff4757; color: white; }
+
+        #btn-reset-settings {
+            position: absolute; top: 20px; right: 20px;
+            width: auto !important; padding: 8px 16px !important;
+            font-size: 14px !important; background: rgba(255, 255, 255, 0.2) !important;
+            color: #fff !important; border: 1px solid rgba(255, 255, 255, 0.5) !important;
+            box-shadow: none !important; margin: 0 !important; border-radius: 20px !important;
+        }
+        #btn-reset-settings:hover { background: rgba(255, 255, 255, 0.4) !important; }
+
+        #start-screen { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
+
+        #game-over-screen { background: rgba(0, 0, 0, 0.9); display: none; padding: 0 20px; }
+        #game-over-screen h1 { font-size: 36px; margin-bottom: 10px; text-align: center; }
+        .result-stats { font-size: 18px; color: #fff; margin-bottom: 30px; text-align: center; line-height: 1.6; width: 100%; max-width: 400px;}
+        .result-stats span { color: #FFD700; font-weight: bold; }
+
+        /* 缓慢淡入动画 */
+        @keyframes fadeInSlow {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .fade-in-slow {
+            animation: fadeInSlow 2.5s ease-in-out forwards;
+        }
+
+        #ui { position: absolute; top: 10px; left: 10px; color: #333; font-family: sans-serif; font-weight: bold; font-size: 12px; z-index: 10; pointer-events: none; display: none; }
+        .stats { display: flex; gap: 10px; margin-bottom: 5px; text-shadow: 1px 1px 0 #fff; }
+        
+        #timer-display {
+            position: absolute; top: 10px; right: 15px;
+            font-size: 16px; font-weight: bold; color: #333;
+            background: rgba(255, 255, 255, 0.7); padding: 4px 10px;
+            border-radius: 8px; font-family: monospace;
+            z-index: 10; pointer-events: none; display: none;
+            box-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+        }
+
+        .progress-container { 
+            width: 160px; height: 16px; background: rgba(0, 0, 0, 0.4); 
+            border: 2px solid #333; border-radius: 8px; position: relative; overflow: hidden; 
+            box-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+        }
+        .progress-bar { 
+            height: 100%; width: 0%; background: linear-gradient(90deg, #4CAF50, #8BC34A); 
+            transition: width 0.2s ease-out; 
+        }
+        .progress-text { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            display: flex; justify-content: center; align-items: center; 
+            color: #fff; font-size: 10px; text-shadow: 1px 1px 2px #000; 
+        }
+        
+        #controls { position: absolute; bottom: 20px; width: 100%; max-width: 600px; left: 50%; transform: translateX(-50%); display: none; justify-content: space-between; padding: 0 20px; box-sizing: border-box; pointer-events: none; }
+        .btn { 
+            width: 80px; height: 80px; background: rgba(255, 255, 255, 0.4); 
+            border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            font-size: 40px; font-weight: bold; color: #333; pointer-events: auto; user-select: none; touch-action: none; 
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.8); }
+
+        #toast-alert {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 87, 34, 0.95);
+            color: white;
+            padding: 12px 28px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        #toast-alert.show {
+            bottom: 120px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast-alert">您还可以游玩三次</div>
+
+    <div id="start-screen" class="menu-container">
+        <button id="btn-reset-settings">重新载入页面</button>
+        <h1>抢手机大赛</h1>
+        <h2>beta</h2>
+        <button class="menu-btn" id="btn-start">开始游戏</button>
+        <button class="menu-btn btn-danger" id="btn-exit">退出游戏</button>
+    </div>
+
+    <div id="game-over-screen" class="menu-container">
+        <h1 id="game-result-title">游戏结束！</h1>
+        <div class="result-stats" id="result-stats">
+            <div id="final-round-display">第 <span>1</span> 轮结束</div>
+            <div id="final-time-display">用时：<span>00:00</span></div>
+        </div>
+        <button class="menu-btn" id="btn-restart">重新开始</button>
+        <button class="menu-btn" id="btn-home">返回主菜单</button>
+    </div>
+
+    <div id="ui">
+        <div class="stats">
+            <span>得分: <span id="score-val">0</span></span>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+            <div class="progress-text" id="progress-text">iPhone dou: 0 / 10</div>
+        </div>
+    </div>
+
+    <div id="timer-display">00:00</div>
+    
+    <div id="controls">
+        <div class="btn" id="btn-left">←</div>
+        <div class="btn" id="btn-right">→</div>
+    </div>
+
+    <canvas id="game"></canvas>
+    <script>
+        const DEFAULT_PLAYER_SPEED = 4;
+        const DEFAULT_ITEM_SPEED = 2;
+        const DEFAULT_SPAWN_INTERVAL = 60; 
+
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        canvas.width = Math.min(window.innerWidth, 600);
+        canvas.height = window.innerHeight;
+
+        let score = 0, life = 10;
+        let phoneCount = 0; 
+        const maxPhones = 10; 
+        let gameOver = false;
+        let isWin = false; 
+
+        let gameRound = 1;
+        
+        let currentPlayerSpeed = DEFAULT_PLAYER_SPEED;
+        let currentItemSpeed = DEFAULT_ITEM_SPEED;
+        let currentSpawnInterval = DEFAULT_SPAWN_INTERVAL; 
+
+        const player = { x: canvas.width/2 - 17.5, y: canvas.height - 90, width: 35, height: 35, speed: DEFAULT_PLAYER_SPEED };
+        let moveLeft = false, moveRight = false;
+
+        const items = [];
+        let spawnTimer = 0;
+
+        let startTime = 0;
+        let timerInterval = null;
+        let currentElapsedTime = "00:00";
+
+        let toastTimeout = null;
+
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+            const secs = String(totalSeconds % 60).padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            currentElapsedTime = "00:00";
+            document.getElementById('timer-display').innerText = currentElapsedTime;
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameOver) {
+                    currentElapsedTime = formatTime(Date.now() - startTime);
+                    document.getElementById('timer-display').innerText = currentElapsedTime;
+                }
+            }, 1000);
+        }
+
+        function showToast(text, duration = 3000) {
+            const toast = document.getElementById('toast-alert');
+            toast.innerText = text;
+            toast.classList.add('show');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+
+        const bgImage = new Image();
+        bgImage.src = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
+        let bgImageLoaded = false;
+        bgImage.onload = () => { bgImageLoaded = true; };
+        bgImage.onerror = () => { bgImageLoaded = false; };
+
+        const imgPhone = new Image();
+        imgPhone.src = 'https://pic1.imgdb.cn/i/0350yosn7dZk8erkQQ6zU2.jpg'; 
+        imgPhone.onerror = () => { console.error("手机图片加载失败！"); };
+
+        const imgBomb = new Image();
+        imgBomb.src = 'https://img.icons8.com/color/96/bomb.png'; 
+
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playPopSound(isPhone = true) {
+            if (!audioCtx || audioCtx.state === 'suspended') return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            const startFreq = isPhone ? 800 : 400; 
+            const endFreq = isPhone ? 100 : 50;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + 0.1);
+            const volume = isPhone ? 0.4 : 0.5; 
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playExplosionSound(isBig = false) {
+            if (!audioCtx || audioCtx.state === 'suspended') return;
+            const bufferSize = audioCtx.sampleRate * 1.0; 
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
+            const noiseSource = audioCtx.createBufferSource();
+            noiseSource.buffer = buffer;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(isBig ? 800 : 1500, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+            const gainNode = audioCtx.createGain();
+            const maxVolume = isBig ? 1.0 : 0.3; 
+            gainNode.gain.setValueAtTime(maxVolume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + (isBig ? 0.8 : 0.4));
+            noiseSource.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            noiseSource.start();
+        }
+
+        let particles = [];
+        let fireworkTimer = 0; 
+        let shockwaveRadius = 0; 
+        let shockwaveAlpha = 0;  
+        let smallFireworkCount = 0; 
+
+        class Particle {
+            constructor(x, y, speedMult = 1, sizeMult = 1) {
+                this.x = x;
+                this.y = y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = (Math.random() * 8 + 2) * speedMult; 
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.gravity = 0.15; 
+                this.friction = 0.97; 
+                this.alpha = 1; 
+                this.decay = Math.random() * 0.015 + 0.01; 
+                this.color = `hsl(${Math.random() * 360}, 100%, 60%)`; 
+                this.size = (Math.random() * 3 + 2) * sizeMult; 
+            }
+            update() {
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createFireworks(x, y, count = 100, speedMult = 1, sizeMult = 1, isBigSound = false, shouldSound = true) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, speedMult, sizeMult));
+            }
+            if (shouldSound) {
+                playExplosionSound(isBigSound);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score-val').innerText = score;
+            const percent = Math.min((phoneCount / maxPhones) * 100, 100);
+            document.getElementById('progress-bar').style.width = percent + '%';
+            document.getElementById('progress-text').innerText = `iPhone dou: ${phoneCount} / ${maxPhones}`;
+        }
+
+        document.addEventListener('keydown', e => {
+            initAudio(); 
+            if (e.key === 'ArrowLeft') moveLeft = true;
+            if (e.key === 'ArrowRight') moveRight = true;
+        });
+        document.addEventListener('keyup', e => {
+            if (e.key === 'ArrowLeft') moveLeft = false;
+            if (e.key === 'ArrowRight') moveRight = false;
+        });
+
+        function bindBtn(id, key) {
+            const el = document.getElementById(id);
+            el.addEventListener('touchstart', e => { e.preventDefault(); initAudio(); if (id === 'btn-left') moveLeft = true; if (id === 'btn-right') moveRight = true; });
+            el.addEventListener('touchend', e => { e.preventDefault(); if (id === 'btn-left') moveLeft = false; if (id === 'btn-right') moveRight = false; });
+            el.addEventListener('touchcancel', e => { e.preventDefault(); if (id === 'btn-left') moveLeft = false; if (id === 'btn-right') moveRight = false; });
+            el.addEventListener('mousedown', () => { initAudio(); if (id === 'btn-left') moveLeft = true; if (id === 'btn-right') moveRight = true; });
+            el.addEventListener('mouseup', () => { if (id === 'btn-left') moveLeft = false; if (id === 'btn-right') moveRight = false; });
+            el.addEventListener('mouseleave', () => { if (id === 'btn-left') moveLeft = false; if (id === 'btn-right') moveRight = false; });
+        }
+        bindBtn('btn-left', 'left');
+        bindBtn('btn-right', 'right');
+
+        function showGameOverScreen() {
+            const gameOverScreen = document.getElementById('game-over-screen');
+            document.getElementById('controls').style.display = 'none'; 
+            gameOverScreen.style.display = 'flex'; 
+            
+            const title = document.getElementById('game-result-title');
+            const statsDiv = document.getElementById('result-stats');
+            const btnRestart = document.getElementById('btn-restart');
+            const btnHome = document.getElementById('btn-home');
+
+            if (gameRound === 7) {
+                gameOverScreen.classList.remove('fade-in-slow');
+                void gameOverScreen.offsetWidth; 
+                gameOverScreen.classList.add('fade-in-slow');
+
+                title.innerText = '🌹私密马赛🌹';
+                title.style.color = '#ff4757';
+                title.style.fontSize = '40px';
+                
+                statsDiv.innerHTML = `
+                    <div style="font-size: 16px; text-align: left; line-height: 2; margin-top: 15px; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px;">
+                        因为我是第1次接触编程😭，<br>
+                        在后面有一个 bug，<br>
+                        但是重新开启这个网页就可以解决了，<br>
+                        所以请重启这个网页吧。
+                    </div>
+                `;
+                
+                btnRestart.style.display = 'none';
+                btnHome.style.display = 'none';
+            } else {
+                gameOverScreen.classList.remove('fade-in-slow');
+
+                if (isWin) {
+                    title.innerText = '🎉 成功集齐 iPhone dou！';
+                    title.style.color = '#FFD700';
+                } else {
+                    title.innerText = '💥 游戏失败！';
+                    title.style.color = '#ff4757';
+                }
+                title.style.fontSize = '36px';
+                
+                statsDiv.innerHTML = `
+                    <div id="final-round-display">第 <span>${gameRound}</span> 轮结束</div>
+                    <div id="final-time-display">用时：<span>${currentElapsedTime}</span></div>
+                `;
+                
+                btnRestart.style.display = 'block';
+                btnHome.style.display = 'block';
+            }
+        }
+
+        function reset() {
+            score = 0; life = 10; phoneCount = 0; 
+            gameOver = false; isWin = false;
+            
+            // ==========================================
+            // 【修改点：将除数从 2 改为 1.25】
+            // ==========================================
+            const divisor = Math.pow(1.25, gameRound - 1);
+            
+            currentPlayerSpeed = Math.max(0.05, DEFAULT_PLAYER_SPEED / divisor);
+            currentItemSpeed = Math.max(0.05, DEFAULT_ITEM_SPEED / divisor);
+            // 刷新间隔乘以 divisor，因为 divisor 变小了，间隔增加也会变缓
+            currentSpawnInterval = Math.min(600, DEFAULT_SPAWN_INTERVAL * divisor);
+            
+            player.speed = currentPlayerSpeed;
+
+            player.x = canvas.width/2 - 17.5; 
+            items.length = 0;
+            particles = [];
+            fireworkTimer = 0;
+            shockwaveRadius = 0;
+            shockwaveAlpha = 0;
+            smallFireworkCount = 0; 
+            
+            startTimer(); 
+            updateUI();
+
+            if (gameRound === 5) {
+                showToast('您还可以游玩三次');
+            } else if (gameRound === 6) {
+                showToast('您还可以游玩两次');
+            } else if (gameRound === 7) {
+                showToast('您还可以游玩一次');
+            }
+
+            update();
+        }
+
+        function update() {
+            if (!gameOver) {
+                if (moveLeft && player.x > 0) player.x -= player.speed;
+                if (moveRight && player.x < canvas.width - player.width) player.x += player.speed;
+
+                spawnTimer++;
+                if (spawnTimer > currentSpawnInterval) {
+                    spawnTimer = 0;
+                    const isPhone = Math.random() > 0.4;
+                    items.push({
+                        x: Math.random() * (canvas.width - 60),
+                        y: -40,
+                        width: isPhone ? 60 : 40, 
+                        height: 40,
+                        speed: currentItemSpeed,
+                        type: isPhone ? 'phone' : 'bomb'
+                    });
+                }
+
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const item = items[i];
+                    item.y += item.speed;
+
+                    if (item.y + item.height > player.y &&
+                        item.x < player.x + player.width &&
+                        item.x + item.width > player.x) {
+                        
+                        if (item.type === 'phone') {
+                            playPopSound(true);
+                            score += 10;
+                            phoneCount++;
+                            
+                            if (phoneCount >= maxPhones) {
+                                isWin = true;
+                                gameOver = true;
+                                createFireworks(canvas.width / 2, canvas.height / 2, 300, 2.5, 1.5, true, true);
+                                shockwaveRadius = 10;
+                                shockwaveAlpha = 1;
+                                fireworkTimer = 0; 
+                                showGameOverScreen(); 
+                            }
+                        } else if (item.type === 'bomb') {
+                            playExplosionSound(false); 
+                            phoneCount = Math.max(0, phoneCount - 1); 
+                            
+                            if (phoneCount <= 0) {
+                                gameOver = true;
+                                isWin = false;
+                                showGameOverScreen(); 
+                            }
+                        }
+                        
+                        items.splice(i, 1);
+                        updateUI(); 
+                        
+                        if (gameOver) break; 
+                        continue;
+                    }
+
+                    if (item.y > canvas.height) items.splice(i, 1);
+                }
+            } else if (isWin) {
+                fireworkTimer++;
+                if (fireworkTimer > 60 && fireworkTimer % 40 === 0) {
+                    const randomX = Math.random() * canvas.width;
+                    const randomY = Math.random() * (canvas.height / 2);
+                    let shouldSound = false;
+                    if (smallFireworkCount < 5) {
+                        shouldSound = true;
+                        smallFireworkCount++;
+                    }
+                    createFireworks(randomX, randomY, 100, 1, 1, false, shouldSound);
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            if (shockwaveAlpha > 0) {
+                shockwaveRadius += 20; 
+                shockwaveAlpha -= 0.03; 
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function drawItemImage(img, x, y, w, h) {
+            const imgRatio = img.naturalWidth / img.naturalHeight;
+            let drawW = w;
+            let drawH = h;
+            if (w / h > imgRatio) {
+                drawW = h * imgRatio;
+            } else {
+                drawH = w / imgRatio;
+            }
+            const offsetX = (w - drawW) / 2;
+            const offsetY = (h - drawH) / 2;
+            ctx.drawImage(img, x + offsetX, y + offsetY, drawW, drawH);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (bgImageLoaded) {
+                const imgRatio = bgImage.width / bgImage.height;
+                const canvasRatio = canvas.width / canvas.height;
+                let drawW, drawH, offsetX, offsetY;
+
+                if (canvasRatio > imgRatio) {
+                    drawW = canvas.width;
+                    drawH = canvas.width / imgRatio;
+                    offsetX = 0;
+                    offsetY = (canvas.height - drawH) / 2;
+                } else {
+                    drawW = canvas.height * imgRatio;
+                    drawH = canvas.height;
+                    offsetX = (canvas.width - drawW) / 2;
+                    offsetY = 0;
+                }
+                ctx.globalAlpha = 0.7; 
+                ctx.drawImage(bgImage, offsetX, offsetY, drawW, drawH);
+                ctx.globalAlpha = 1.0; 
+            }
+
+            if (!gameOver) {
+                ctx.font = '40px sans-serif';
+                ctx.fillText('🧑‍🦲', canvas.width/2 - 20, 60);
+
+                items.forEach(item => {
+                    if (item.type === 'phone') {
+                        if (imgPhone.complete && imgPhone.naturalWidth > 0) {
+                            drawItemImage(imgPhone, item.x, item.y, item.width, item.height);
+                        } else {
+                            ctx.font = '40px sans-serif';
+                            ctx.fillText('📱', item.x, item.y + 30);
+                        }
+                    } else if (item.type === 'bomb') {
+                        if (imgBomb.complete && imgBomb.naturalWidth > 0) {
+                            drawItemImage(imgBomb, item.x, item.y, item.width, item.height);
+                        } else {
+                            ctx.font = '40px sans-serif';
+                            ctx.fillText('💣', item.x, item.y + 30);
+                        }
+                    }
+                });
+
+                ctx.font = '35px sans-serif';
+                ctx.fillText('😎', player.x, player.y + 30);
+            } else {
+                if (isWin) {
+                    if (shockwaveAlpha > 0) {
+                        ctx.save();
+                        ctx.globalAlpha = shockwaveAlpha;
+                        ctx.beginPath();
+                        ctx.arc(canvas.width/2, canvas.height/2, shockwaveRadius, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                    particles.forEach(p => p.draw());
+                }
+            }
+        }
+
+        setInterval(() => {
+            let fixed = false;
+            if (player.speed !== currentPlayerSpeed) {
+                player.speed = currentPlayerSpeed;
+                fixed = true;
+            }
+            items.forEach(item => {
+                if (item.speed !== currentItemSpeed) {
+                    item.speed = currentItemSpeed;
+                    fixed = true;
+                }
+            });
+            if (fixed) {
+                console.warn("⚠️ 检测到速度被异常篡改，系统已强制锁定为当前轮次的速度！");
+            }
+        }, 1000);
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('ui').style.display = 'block';
+            document.getElementById('controls').style.display = 'flex';
+            document.getElementById('timer-display').style.display = 'block';
+            initAudio();
+            
+            gameRound = 1; 
+            reset();
+        });
+
+        document.getElementById('btn-exit').addEventListener('click', () => {
+            window.close();
+            setTimeout(() => { window.location.href = 'about:blank'; }, 100);
+        });
+
+        document.getElementById('btn-reset-settings').addEventListener('click', () => {
+            const confirmReload = confirm("确定要重新载入此页面吗？");
+            if (confirmReload) {
+                window.location.reload();
+            }
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            document.getElementById('game-over-screen').style.display = 'none';
+            document.getElementById('controls').style.display = 'flex';
+            
+            gameRound++; 
+            reset();
+        });
+
+        document.getElementById('btn-home').addEventListener('click', () => {
+            document.getElementById('game-over-screen').style.display = 'none';
+            document.getElementById('ui').style.display = 'none';
+            document.getElementById('timer-display').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+            
+            clearInterval(timerInterval); 
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            items.length = 0;
+            particles = [];
+        });
+
+    </script>
+</body>
+</html>
